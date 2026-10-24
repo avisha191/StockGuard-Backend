@@ -42,8 +42,17 @@ public class SecurityConfig {
                     "/error"
                 ).permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                // Public product browsing
                 .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
-                .anyRequest().hasRole("ADMIN"))
+                .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+
+                // Public test order placement
+                .requestMatchers(HttpMethod.POST, "/api/orders").permitAll()
+
+                // Everything else requires an admin token
+                .anyRequest().hasRole("ADMIN")
+            )
             .addFilterBefore(
                 jwtAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class)
@@ -80,4 +89,5 @@ public class SecurityConfig {
         return source;
     }
 }
+
 

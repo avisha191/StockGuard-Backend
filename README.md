@@ -1,16 +1,18 @@
 ﻿# StockGuard — Inventory Management API
 
-A backend-focused inventory management system built with **Java, Spring Boot, and PostgreSQL**. StockGuard manages products, inventory, and orders while protecting against overselling during concurrent requests.
+A backend-focused inventory management system built with Java, Spring Boot, and PostgreSQL. StockGuard demonstrates secure REST APIs, JWT authentication, transactional stock updates, and concurrency-safe order processing.
 
 ## Features
 
-- **Inventory Management:** Create, view, update, and delete products.
-- **Order Management:** Place orders, view order details, and cancel orders.
-- **Concurrency Control:** Atomic conditional stock updates prevent inventory from becoming negative.
-- **Transactional Operations:** Keep stock deductions and order creation consistent.
-- **Cancellation Protection:** Prevent duplicate cancellations from restoring stock more than once.
-- **JWT Authentication:** Token-based authentication for protected API endpoints.
-- **Persistent Storage:** PostgreSQL database integration using Spring Data JPA and Hibernate.
+- **Product management:** Create, view, update, and delete inventory products.
+- **Order management:** Place orders, view order history, and cancel orders.
+- **Atomic stock deduction:** Orders are accepted only when sufficient stock is available.
+- **Concurrency protection:** Prevents multiple simultaneous orders from overselling available inventory.
+- **Safe cancellation:** Restores stock when an order is cancelled and prevents duplicate stock restoration.
+- **JWT authentication:** Protects administrative operations.
+- **Public product catalogue:** Allows visitors to browse products without logging in.
+- **Public test ordering:** Supports placing test orders through the public API.
+- **API documentation:** Swagger UI and OpenAPI endpoints.
 
 ## Tech Stack
 
@@ -18,79 +20,100 @@ A backend-focused inventory management system built with **Java, Spring Boot, an
 |---|---|
 | Java | Backend programming language |
 | Spring Boot | REST API and application framework |
-| Spring Data JPA | Database access |
-| Hibernate | ORM and entity management |
-| PostgreSQL | Relational database |
 | Spring Security | Authentication and authorization |
-| JWT | Token-based authentication |
-| Maven | Dependency management and build |
+| JWT | Stateless authentication |
+| Spring Data JPA / Hibernate | Database access and ORM |
+| PostgreSQL | Relational database |
+| Maven | Dependency and build management |
+| Swagger / OpenAPI | API documentation |
 
 ## Architecture
 
-The backend follows a layered architecture:
-
-- **Controller:** Handles HTTP requests and responses.
-- **Service:** Implements inventory, order, and authentication logic.
-- **Repository:** Performs database operations.
-- **Entity:** Represents products, users, orders, and order statuses.
-- **Security:** Validates JWTs and protects API endpoints.
+```text
+Client / React Frontend
+          |
+          v
+     REST API
+   Spring Boot
+          |
+          v
+ Spring Security + JWT
+          |
+          v
+ Services + Transactions
+          |
+          v
+ Spring Data JPA
+          |
+          v
+    PostgreSQL
+```
 
 ## API Endpoints
 
+All endpoints use the `/api` prefix.
+
 ### Authentication
 
-| Method | Endpoint | Description |
+| Method | Endpoint | Access |
 |---|---|---|
-| POST | `/api/auth/login` | Authenticate and obtain a JWT |
+| POST | `/api/auth/login` | Public |
+
+Login returns a JWT token used to authenticate protected requests.
 
 ### Products
 
-| Method | Endpoint | Description |
+| Method | Endpoint | Access |
 |---|---|---|
-| GET | `/api/products` | Retrieve products |
-| POST | `/api/products` | Create a product |
-| PUT | `/api/products/{id}` | Update a product |
-| DELETE | `/api/products/{id}` | Delete a product |
+| GET | `/api/products` | Public |
+| GET | `/api/products/{id}` | Public |
+| POST | `/api/products` | Admin |
+| PUT | `/api/products/{id}` | Admin |
+| DELETE | `/api/products/{id}` | Admin |
 
 ### Orders
 
-| Method | Endpoint | Description |
+| Method | Endpoint | Access |
 |---|---|---|
-| POST | `/api/orders?productId={id}&quantity={quantity}` | Place an order |
-| GET | `/api/orders` | Retrieve orders |
-| GET | `/api/orders/{id}` | Retrieve an order |
-| PUT | `/api/orders/{id}/cancel` | Cancel an order |
+| POST | `/api/orders?productId={id}&quantity={quantity}` | Public test ordering |
+| GET | `/api/orders` | Admin |
+| PUT | `/api/orders/{id}/cancel` | Admin |
 
-Protected endpoints require a valid JWT in the `Authorization` header:
+Public test ordering changes inventory in the database. The public order endpoint should be used only for demonstration and testing.
 
-`Authorization: Bearer <token>`
+### API Documentation
 
-## Concurrency and Overselling Prevention
+When the backend is running:
 
-StockGuard uses a conditional database update to deduct inventory only when sufficient stock is available.
+- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
 
-```sql
-UPDATE product
-SET stock = stock - :quantity
-WHERE id = :productId
-  AND stock >= :quantity;
-```
+## Concurrency and Transaction Safety
 
-The database executes this update atomically. When concurrent requests compete for limited inventory, a request that cannot satisfy the stock condition is rejected rather than allowing inventory to become negative.
+StockGuard addresses a common inventory management problem: two customers attempting to purchase the same remaining stock at the same time.
 
-Order placement is transactional, helping maintain consistency between stock deductions and order creation.
+The stock deduction operation checks availability and updates stock atomically. If insufficient stock remains, the order is rejected rather than allowing the inventory to become negative.
 
-## Cancellation Safety
+Order cancellation also uses transaction-safe processing to restore stock and prevent repeated cancellations from restoring stock more than once.
 
-When an order is cancelled, StockGuard restores the ordered quantity to inventory. The cancellation logic locks the order record and checks its status, preventing repeated cancellation from restoring stock multiple times.
+### Example
+
+Suppose a product has 5 units in stock, and two requests simultaneously attempt to order 4 units each.
+
+- One order can succeed.
+- The other order is rejected because sufficient stock is no longer available.
+- Stock does not become negative.
+
+This behavior was verified using concurrent requests during local testing.
 
 ## Local Setup
 
 ### Prerequisites
 
-- Java JDK compatible with the project
-- PostgreSQL database
+- Java JDK compatible with the project's `pom.xml`
 - Git
+- PostgreSQL database (local or hosted)
+- Maven Wrapper included in this repository
 
 ### 1. Clone the repository
 
@@ -101,42 +124,62 @@ cd StockGuard-Backend
 
 ### 2. Configure environment variables
 
-In PowerShell, set the following variables for your terminal session:
+Set the following environment variables before starting the application:
+
+| Variable | Description |
+|---|---|
+| `DB_URL` | JDBC URL of your PostgreSQL database |
+| `DB_USERNAME` | Database username |
+| `DB_PASSWORD` | Database password |
+| `JWT_SECRET` | Secret used to sign JWTs |
+
+Example PowerShell configuration:
 
 ```powershell
-$env:DB_URL="YOUR_POSTGRESQL_JDBC_URL"
+$env:DB_URL="jdbc:postgresql://HOST/DATABASE?sslmode=require"
 $env:DB_USERNAME="YOUR_DATABASE_USERNAME"
 $env:DB_PASSWORD="YOUR_DATABASE_PASSWORD"
-$env:JWT_SECRET="YOUR_STRONG_JWT_SECRET"
+$env:JWT_SECRET="YOUR_LONG_RANDOM_SECRET"
 ```
 
-Use your own credentials and a strong JWT signing secret. **Never commit real credentials or secrets to GitHub.**
+Replace the example values with your own credentials. Never commit real credentials or secrets to GitHub.
 
-### 3. Run the application
+### 3. Run the backend
+
+On Windows:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
-The API runs at `http://localhost:8080` by default.
+The API should start at:
 
-## Testing
+`http://localhost:8080`
 
-The following scenarios have been manually tested:
+### 4. Build the application
 
-- Two simultaneous orders competing for limited stock.
-- Rejection of orders exceeding available inventory.
-- Successful orders for the exact available quantity.
-- Rejection of orders when stock reaches zero.
-- Stock restoration after cancellation.
-- Rejection of duplicate cancellation attempts.
+```powershell
+.\mvnw.cmd clean package
+```
 
-In the concurrent test, two requests attempted to order four units each when stock was five. One order succeeded, the other was rejected with HTTP `409 Conflict`, and the remaining stock was one unit.
+## Security Notes
+
+- Administrative endpoints require an authenticated admin token.
+- Passwords are stored as password hashes rather than plaintext.
+- Database credentials and JWT secrets are supplied through environment variables.
+- Public ordering is intended for demonstration; additional rate limiting can be added for production use.
+- Database schema migrations and stricter production configuration are potential future improvements.
 
 ## Future Improvements
 
-- Expanded automated unit and integration test coverage.
-- API documentation with Swagger/OpenAPI.
-- Production deployment and monitoring.
-- Additional validation and error-handling improvements.
+- Automated integration and concurrency tests.
+- Request rate limiting for public order placement.
+- Database migration management.
+- Pagination and filtering for larger catalogues.
+- More detailed audit logging and monitoring.
 
+## Author
+
+**Avisha Sahu**
+
+GitHub: [@avisha191](https://github.com/avisha191)
