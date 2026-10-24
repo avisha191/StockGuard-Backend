@@ -35,9 +35,14 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/swagger-ui/**", "/swagger-ui.html",
-                                 "/v3/api-docs/**", "/error").permitAll()
+                .requestMatchers(
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/v3/api-docs/**",
+                    "/error"
+                ).permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
                 .anyRequest().hasRole("ADMIN"))
             .addFilterBefore(
                 jwtAuthenticationFilter,
@@ -56,18 +61,23 @@ public class SecurityConfig {
             "http://localhost:5173",
             "http://localhost:5174"
         ));
+
         config.setAllowedMethods(List.of(
             "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
         ));
+
         config.setAllowedHeaders(List.of(
             "Authorization", "Content-Type"
         ));
+
         config.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
+
         source.registerCorsConfiguration("/**", config);
 
         return source;
     }
 }
+
